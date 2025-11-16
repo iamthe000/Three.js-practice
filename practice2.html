@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Three.js クリック検知テスト</title>
+    <style>
+        /* CSS: ページ全体の設定 */
+        body { margin: 0; overflow: hidden; } /* ページのマージンをゼロにし、スクロールバーを非表示にして全画面表示にする */
+        canvas { display: block; }            /* canvas要素をブロック要素にして、予期せぬ空白を消す */
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. 基本設定（シーン、カメラ、レンダラーの初期化）
+        // ==========================================
+
+        // シーン（3D空間の舞台）を作成
+        const scene = new THREE.Scene();
+
+        // カメラ（視点）を作成
+        const camera = new THREE.PerspectiveCamera(
+            75,                                  // 視野角 (fov): 広いほど見える範囲が広い
+            window.innerWidth / window.innerHeight, // アスペクト比: 画面の縦横比に合わせる
+            0.1,                                 // 描画開始距離 (Near): これより近いものは描画されない
+            1000                                 // 描画終了距離 (Far): これより遠いものは描画されない
+        );
+
+        // カラーコードの定義（16進数）
+        const red = 0xff0000;  // 赤
+        const blue = 0x0000ff; // 青 (クリック後の色)
+        const grey = 0x404040; // 灰色 (間接光に使用)
+        const white = 0xffffff; // 白 (直接光に使用)
+
+        // カメラの位置を調整（Z軸方向に5離れた位置から立方体を見る）
+        camera.position.z = 5;
+        
+        // レンダラー（描画担当者）を作成し、画面に表示
+        const renderer = new THREE.WebGLRenderer({ antialias: true }); // antialias: ギザギザを滑らかにする設定
+        renderer.setSize(window.innerWidth, window.innerHeight); // レンダラーのサイズを画面全体に設定
+        document.body.appendChild(renderer.domElement); // 生成した描画領域（canvas要素）をHTMLに追加
+
+        // ウィンドウリサイズ時の処理
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            // 画面サイズが変わったら、カメラのアスペクト比とレンダラーのサイズを更新し、歪みを防ぐ
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix(); // カメラの投影行列を更新
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // ==========================================
+        // 2. オブジェクト (Mesh) の作成
+        // ==========================================
+
+        // 形状（ジオメトリ）を作成：1x1x1の立方体
+        const geometry = new THREE.BoxGeometry(1, 1, 1); 
+        // 材質（マテリアル）を作成：初期色は赤、光の影響を受ける標準的な材質
+        const material = new THREE.MeshStandardMaterial({ color: red }); 
+        // 形状と材質を組み合わせてメッシュ（オブジェクト本体）を作成
+        const cube = new THREE.Mesh(geometry, material);
+        scene.add(cube); // シーンに立方体を追加
+
+        // ==========================================
+        // 3. ライトの追加（オブジェクトを照らす）
+        // ==========================================
+
+        // 環境光（AmbientLight）：全体を均等に照らす光（影はできない）。
+        const ambientLight = new THREE.AmbientLight(grey, 1);
+        scene.add(ambientLight);
+
+        // 方向性ライト（DirectionalLight）：太陽のように、特定方向からくる光。
+        const directionalLight = new THREE.DirectionalLight(white, 0.8);
+        directionalLight.position.set(1, 1, 1); // 右上奥から光が当たるように設定
+        scene.add(directionalLight);
+
+        // ==========================================
+        // 4. クリック検知のための初期化 (Raycaster)
+        // ==========================================
+        
+        // Raycaster: カメラからマウスの位置に向かって「見えない光線（Ray）」を飛ばし、
+        // 3D空間のオブジェクトと光線が交差したかどうかを検知する役割を果たします。
+        const raycaster = new THREE.Raycaster();
+        
+        // マウスの画面座標を格納するためのVector2オブジェクト（x座標とy座標のセット）
+        const mouse = new THREE.Vector2();
+
+        // ==========================================
+        // 5. クリックイベントリスナーの追加
+        // ==========================================
+
+        // マウスでクリックされたときに実行される関数
+        function onClick(event) {
+            // 1. マウス座標をThree.jsの座標系に変換（正規化）
+            // DOM座標（左上：0,0）をNDC座標（中央：0,0、X: -1～+1、Y: -1～+1）に変換します。
+            // これがRaycasterが光線を飛ばすために必要な座標です。
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1; // Y軸は上下が逆になるため、ここで反転させています
+
+            // 2. Raycasterを更新
+            // 「どのカメラから」「どのマウス位置へ」光線を飛ばすかを設定します。
+            raycaster.setFromCamera(mouse, camera);
+
+            // 3. クリックと交差するオブジェクトを検知
+            // `[cube]` の中から、光線が当たったオブジェクトの情報を配列として取得します。
+            // 配列には、手前から当たった順に情報が入ります。
+            const intersects = raycaster.intersectObjects([cube]); 
+
+            // 4. 交差したオブジェクトがあった場合の処理
+            if (intersects.length > 0) {
+                // 配列の最初の要素（intersects[0]）が、最も手前で衝突したオブジェクトです。
+                const firstIntersected = intersects[0].object;
+
+                // 衝突したのが「cube」オブジェクトであることを確認
+                if (firstIntersected === cube) {
+                    // 現在の色を取得し、赤と青を切り替える
+                    const currentColor = firstIntersected.material.color.getHex(); // 現在の色を数値（16進数）で取得
+                    
+                    if (currentColor === red) {
+                        // 現在の色が赤なら、青に設定
+                        firstIntersected.material.color.set(blue);
+                    } else {
+                        // それ以外（青）なら、赤に設定
+                        firstIntersected.material.color.set(red);
+                    }
+                    
+                    // ※ 注意：色が変わったことをGPUに通知するため、マテリアルに更新フラグを立てる必要はありません。
+                    // 座標やテクスチャの変更時と異なり、色の変更は自動で反映されます。
+                }
+            }
+        }
+
+        // HTMLドキュメント全体にクリックイベントリスナーを設定し、上記関数を呼び出す
+        document.addEventListener('click', onClick, false);
+
+
+        // ==========================================
+        // 6. アニメーションループ (Render Loop)
+        // ==========================================
+
+        function animate() {
+            requestAnimationFrame(animate); // 次の描画タイミングで再度この関数を呼び出す（ループ処理）
+            
+            // 立方体を少しずつ回転させる
+            cube.rotation.x += 0.01;
+            cube.rotation.y += 0.01;
+
+            renderer.render(scene, camera); // シーンをカメラを通して描画
+        }
+
+        // アニメーションループを開始
+        animate();
+    </script>
+</body>
+</html>
