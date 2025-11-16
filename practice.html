@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Three.js 基本動作テスト</title>
+    <style>
+        /* CSSで<body>と<canvas>のスタイルを定義 */
+        body { margin: 0; overflow: hidden; } /* ページのマージンをゼロにし、スクロールバーを非表示にする */
+        canvas { display: block; }            /* canvas要素をブロック要素として表示し、予期せぬ空白を消す */
+    </style>
+</head>
+<body>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ==========================================
+        // 1. シーン、カメラ、レンダラーの初期化
+        // ==========================================
+
+        // シーンを作成：オブジェクト、カメラ、ライトを配置する「舞台」
+        const scene = new THREE.Scene();
+
+        // カメラを作成：3D空間を見る「視点」
+        const camera = new THREE.PerspectiveCamera(
+            75,                                  // 視野角 (Field of View: fov)
+            window.innerWidth / window.innerHeight, // アスペクト比 (Aspect Ratio)
+            0.1,                                 // 描画開始距離 (Near)
+            1000                                 // 描画終了距離 (Far)
+        );
+
+        const red = 0xff0000;
+        const grey = 0x404040;
+        const white = 0xffffff;
+
+
+        // カメラをZ軸方向に5ユニット移動させる（オブジェクトが見える位置に配置）
+        camera.position.z = 5; 
+        
+        // レンダラーを作成：3D空間を2D画像として描画する「描画装置」
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        
+        // レンダラーのサイズをウィンドウの幅と高さに設定
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+        // レンダラーが生成したcanvas要素をHTMLのbodyに追加し、画面に表示する
+        document.body.appendChild(renderer.domElement); 
+
+        // ==========================================
+        // 2. オブジェクト (Mesh) の作成
+        // ==========================================
+
+        // ジオメトリを作成：オブジェクトの「形状」データ（ここでは立方体）
+        const geometry = new THREE.BoxGeometry(1, 1, 1);
+
+        // マテリアルを作成：オブジェクトの「質感/色」データ（ここでは赤色でスタンダードな物に設定）
+        const material = new THREE.MeshStandardMaterial({ color: red });
+
+        // メッシュを作成：ジオメトリとマテリアルを結合した「3Dオブジェクト」
+        const cube = new THREE.Mesh(geometry, material);
+
+        // メッシュ（立方体）をシーンに追加
+        scene.add(cube);
+
+        // ==========================================
+        // 3. ライトの追加
+        // ==========================================
+
+        // 環境光を作成：空間全体を均一に照らす光 (色と強さ)
+        const ambientLight = new THREE.AmbientLight(grey, 1);
+        scene.add(ambientLight);
+
+        // 方向性のある光を作成：太陽のように特定方向から来る光 (色と強さ)
+        const directionalLight = new THREE.DirectionalLight(white, 0.8);
+        
+        // 光源の位置を設定
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+
+        // ==========================================
+        // 4. アニメーションループ (Render Loop)
+        // ==========================================
+
+        // 毎フレーム実行されるアニメーション関数を定義
+        function animate() {
+            // ブラウザの描画タイミングに合わせて自身を呼び出し続ける（ループ処理）
+            requestAnimationFrame(animate);
+            
+            // 立方体をX軸を中心に少し回転させる
+            cube.rotation.x += 0.01;
+            
+            // 立方体をY軸を中心に少し回転させる
+            cube.rotation.y += 0.01;
+
+            // シーンとカメラの情報を使って、レンダラーで描画を実行
+            renderer.render(scene, camera);
+        }
+
+        // アニメーションループを開始
+        animate();
+    </script>
+</body>
+</html>
